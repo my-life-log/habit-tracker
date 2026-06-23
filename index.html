@@ -481,7 +481,7 @@ document.getElementById('gsb').onclick=()=>{
   document.getElementById('spinner').style.display='block';
   document.getElementById('login-status').style.display='block';
   document.getElementById('login-status').textContent='登入中…';
-  tokenClient.requestAccessToken({prompt:'consent'});
+  tokenClient.requestAccessToken({prompt:''});
 };
 
 function signOut(){if(!confirm('確定要登出嗎？'))return;google.accounts.oauth2.revoke(accessToken);accessToken=null;userInfo=null;sheetId=null;entries=[];document.getElementById('app').style.display='none';document.getElementById('fab').style.display='none';document.getElementById('spinner').style.display='none';document.getElementById('login-status').style.display='none';document.getElementById('gsb').style.display='flex';document.getElementById('auth').style.display='flex';}
@@ -517,7 +517,7 @@ function bD(inn,cnt,sel,fmt){const el=document.getElementById(inn);el.innerHTML=
 function setupD(did,inn,cnt,isM){const dr=document.getElementById(did);let sy=0,sv=isM?Math.floor(sm/5):sh;const upd=nv=>{if(isM){sm=nv*5;bD(inn,cnt,nv,v=>p(v*5));}else{sh=nv;bD(inn,cnt,nv,null);}};dr.addEventListener('mousedown',e=>{sy=e.clientY;sv=isM?Math.floor(sm/5):sh;const mm=e2=>{upd((sv+Math.round((sy-e2.clientY)/IH)%cnt+cnt)%cnt);};const mu=()=>{document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);});dr.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;sv=isM?Math.floor(sm/5):sh;},{passive:true});dr.addEventListener('touchmove',e=>{upd((sv+Math.round((sy-e.touches[0].clientY)/IH)%cnt+cnt)%cnt);},{passive:true});dr.addEventListener('wheel',e=>{e.preventDefault();const c=isM?Math.floor(sm/5):sh;upd((c+(e.deltaY>0?1:-1)+cnt)%cnt);},{passive:false});}
 function iD(){bD('dhi',24,sh,null);bD('dmi',12,Math.floor(sm/5),v=>p(v*5));setupD('dh','dhi',24,false);setupD('dm','dmi',12,true);}
 
-const tpre={exercise:[{l:'現在',v:null},{l:'早晨',v:'07:00'},{l:'午後',v:'14:00'},{l:'傍晚',v:'18:00'},{l:'夜間',v:'21:00'}],meal:[{l:'現在',v:null},{l:'早餐',v:'08:00'},{l:'午餐',v:'12:00'},{l:'下午茶',v:'15:30'},{l:'晚餐',v:'18:30'},{l:'宵夜',v:'22:00'}],sleep:[{l:'現在',v:null},{l:'22:00',v:'22:00'},{l:'23:00',v:'23:00'},{l:'00:00',v:'00:00'},{l:'01:00',v:'01:00'}],expense:[{l:'現在',v:null},{l:'早上',v:'09:00'},{l:'中午',v:'12:00'},{l:'下午',v:'15:00'},{l:'晚上',v:'19:00'}]};
+const tpre={exercise:[{l:'現在',v:null},{l:'早上',v:'07:00'},{l:'中午',v:'12:00'},{l:'下午',v:'15:00'},{l:'晚上',v:'19:00'}],meal:[{l:'現在',v:null},{l:'早上',v:'08:00'},{l:'中午',v:'12:00'},{l:'下午',v:'15:00'},{l:'晚上',v:'18:30'}],sleep:[{l:'現在',v:null},{l:'早上',v:'07:00'},{l:'中午',v:'12:00'},{l:'下午',v:'15:00'},{l:'晚上',v:'22:00'}],expense:[{l:'現在',v:null},{l:'早上',v:'09:00'},{l:'中午',v:'12:00'},{l:'下午',v:'15:00'},{l:'晚上',v:'19:00'}]};
 function rQt(){document.getElementById('qt').innerHTML=(tpre[st]||tpre.expense).map(x=>`<button class="qt" onclick="sqt(${x.v?`'${x.v}'`:null})">${x.l}</button>`).join('');}
 function sqt(v){const t=v||`${p(new Date().getHours())}:${p(Math.floor(new Date().getMinutes()/5)*5)}`;const[h,m]=t.split(':').map(Number);sh=h;sm=Math.floor(m/5)*5;bD('dhi',24,sh,null);bD('dmi',12,Math.floor(sm/5),v=>p(v*5));}
 function rEp(s){document.getElementById('exp').innerHTML=epl.map(n=>`<button class="ch${s===n?' sl':''}" onclick="pEx('${n}')">${n}</button>`).join('')+`<button class="ch ac" onclick="aEx()">＋ 新增</button>`;}
