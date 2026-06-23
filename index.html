@@ -94,12 +94,26 @@ header h1{font-size:.95rem;font-weight:700}
 .bex{background:#dff9fb;color:#00838f}.bml{background:#fef3cd;color:#9d6b00}.bsl{background:#e8d5f5;color:#7b3fa0}.bok{background:var(--acc-soft);color:var(--acc)}.bep{background:#ffe0e0;color:#c0392b}
 .dk .bex{background:#0d4f5c;color:#4dd6e0}.dk .bml{background:#5c4a00;color:#ffd97d}.dk .bsl{background:#3d2a5c;color:#c49beb}.dk .bep{background:#5c1515;color:#ff7675}
 .fab{position:fixed;bottom:20px;right:20px;width:50px;height:50px;border-radius:50%;background:var(--acc);color:#fff;border:none;font-size:1.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 14px rgba(108,92,231,.45);z-index:200}
+
+/* ===== MODAL ===== */
 .mb{position:fixed;inset:0;background:rgba(0,0,0,.38);display:none;align-items:flex-end;z-index:300}
 .mb.op{display:flex}
-.mo{background:var(--surf);border-radius:16px 16px 0 0;padding:18px 16px 32px;width:100%;max-width:560px;margin:0 auto;animation:up .22s ease;max-height:88vh;overflow-y:auto}
-@keyframes up{from{transform:translateY(100%)}to{transform:none}}
-.mh{width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 13px}
+.mo{
+  background:var(--surf);
+  border-radius:20px 20px 0 0;
+  padding:18px 16px 32px;
+  width:100%;
+  max-width:560px;
+  margin:0 auto;
+  height: 80vh; /* 統一高度 */
+  overflow-y:auto;
+  animation:up .25s ease-out;
+  position:relative;
+}
+@keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mh{width:40px;height:5px;background:var(--bdr);border-radius:3px;margin:0 auto 16px}
 .mo h3{font-size:1rem;font-weight:700;margin-bottom:12px}
+
 .tr{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:12px}
 .tp{padding:8px 4px;border:1.5px solid var(--bdr);border-radius:10px;background:var(--surf2);color:var(--muted);cursor:pointer;text-align:center;font-size:.72rem;font-weight:600;transition:all .15s}
 .tp.sl{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}
@@ -379,7 +393,7 @@ header h1{font-size:.95rem;font-weight:700}
       <div class="fg"><label>備註（選填）</label><input type="text" id="fepnt" placeholder=""></div>
     </div>
     <div class="mb2">
-      <button class="bs" onclick="cM()">取消</button>
+      <button class="bs" onclick="smoothClose('mbg')">取消</button>
       <button class="bd2" id="db" style="display:none" onclick="delE()">刪除</button>
       <button class="bp" onclick="svE()">儲存</button>
     </div>
@@ -394,7 +408,7 @@ header h1{font-size:.95rem;font-weight:700}
     <div class="ch2"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
     <div class="dpg" id="dpg"></div>
     <div class="mb2" style="margin-top:12px">
-      <button class="bs" onclick="cDp()">取消</button>
+      <button class="bs" onclick="smoothClose('dpb')">取消</button>
       <button class="bp" onclick="cfD()">確定</button>
     </div>
   </div>
@@ -424,7 +438,6 @@ function tgT(){dk2=!dk2;document.body.className=dk2?'dk':'';document.getElementB
 function setSS(s){const d=document.getElementById('sdot');d.className='sync-dot'+(s==='syncing'?' syncing':s==='err'?' err':'');}
 function scheduleSave(){setSS('syncing');clearTimeout(syncTimer);syncTimer=setTimeout(async()=>{try{await writeAllEntries();setSS('ok');}catch(e){setSS('err');}},1500);}
 
-// 換背景
 function changeBg(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
@@ -480,40 +493,53 @@ async function tryAutoLogin(){
   }
 }
 
+// ★ 瞬間載入與快取核心邏輯
 window.onload=async()=>{
   loadBg();
   const saved=localStorage.getItem('theme');
   if(saved==='dark'){dk2=true;document.body.className='dk';document.getElementById('thb').textContent='☀️';}
-
-  // 檢查是否從 Google 回調帶回 uid
   const params=new URLSearchParams(location.search);
   const uid=params.get('uid');
   if(uid){
     localStorage.setItem('uid',uid);
     history.replaceState({},'',location.pathname);
   }
-
-  // 嘗試自動登入
+  
   const uidStored=localStorage.getItem('uid');
   if(uidStored){
-    document.getElementById('spinner').style.display='block';
-    document.getElementById('login-status').style.display='block';
-    document.getElementById('login-status').textContent='登入中…';
-    const ok=await tryAutoLogin();
-    if(ok){await enterApp();return;}
+    const cachedEntries = localStorage.getItem('local_entries');
+    if (cachedEntries) {
+      try {
+        entries = JSON.parse(cachedEntries);
+        await enterApp(); 
+        setSS('syncing'); 
+      } catch(e){}
+    } else {
+      document.getElementById('spinner').style.display='block';
+      document.getElementById('login-status').style.display='block';
+      document.getElementById('login-status').textContent='資料同步中…';
+    }
+
+    tryAutoLogin().then(ok => {
+      if (ok && !cachedEntries) {
+        enterApp();
+      } else if (!ok) {
+        signOut();
+      }
+    });
+    return;
   }
   showLogin();
 };
 
-document.getElementById('gsb').onclick=()=>{
-  window.location.href=`${WORKER}/login`;
-};
+document.getElementById('gsb').onclick=()=>{window.location.href=`${WORKER}/login`;};
 
 async function signOut(){
   if(!confirm('確定要登出嗎？'))return;
   const uid=localStorage.getItem('uid');
   if(uid)await fetch(`${WORKER}/logout?uid=${uid}`).catch(()=>{});
   localStorage.removeItem('uid');
+  localStorage.removeItem('local_entries');
   accessToken=null;userInfo=null;sheetId=null;entries=[];
   document.getElementById('app').style.display='none';
   document.getElementById('fab').style.display='none';
@@ -521,7 +547,6 @@ async function signOut(){
   showLogin();
 }
 
-// 自動刷新 access token（每 50 分鐘）
 setInterval(async()=>{
   const uid=localStorage.getItem('uid');
   if(!uid||!accessToken)return;
@@ -548,8 +573,32 @@ async function initSheet(){
   await loadAllData();await loadSettings();
 }
 async function sw(range,values){await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,{method:'PUT',headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},body:JSON.stringify({values})});}
-async function writeAllEntries(){const rows=[['id','date','type','time','name','value','amt','note','cat','fm']];for(const e of entries)rows.push([e.id,e.date,e.type,e.time,e.name||'',e.value||'',e.amt||'',e.note||'',e.cat||'',e.fm?'1':'']);await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/entries:clear`,{method:'POST',headers:{Authorization:`Bearer ${accessToken}`}});await sw(`entries!A1:J${rows.length}`,rows);}
-async function loadAllData(){const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/entries!A2:J`,{headers:{Authorization:`Bearer ${accessToken}`}});const data=await r.json();entries=[];if(data.values){for(const row of data.values){if(!row[0])continue;entries.push({id:row[0],date:row[1],type:row[2],time:row[3],name:row[4]||'',value:row[5]||'',amt:row[6]||'',note:row[7]||'',cat:row[8]||'',fm:row[9]==='1'});}}}
+
+// ★ 快取寫入邏輯
+async function writeAllEntries(){
+  localStorage.setItem('local_entries', JSON.stringify(entries));
+  const rows=[['id','date','type','time','name','value','amt','note','cat','fm']];
+  for(const e of entries)rows.push([e.id,e.date,e.type,e.time,e.name||'',e.value||'',e.amt||'',e.note||'',e.cat||'',e.fm?'1':'']);
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/entries:clear`,{method:'POST',headers:{Authorization:`Bearer ${accessToken}`}});
+  await sw(`entries!A1:J${rows.length}`,rows);
+}
+
+// ★ 快取讀取與背景刷新邏輯
+async function loadAllData(){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/entries!A2:J`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  const data=await r.json();
+  entries=[];
+  if(data.values){
+    for(const row of data.values){
+      if(!row[0])continue;
+      entries.push({id:row[0],date:row[1],type:row[2],time:row[3],name:row[4]||'',value:row[5]||'',amt:row[6]||'',note:row[7]||'',cat:row[8]||'',fm:row[9]==='1'});
+    }
+  }
+  localStorage.setItem('local_entries', JSON.stringify(entries));
+  if(curTab==='c') rC(); if(curTab==='e') rE(); if(curTab==='s') rS();
+  setSS('ok');
+}
+
 async function loadSettings(){const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/settings!A2:B10`,{headers:{Authorization:`Bearer ${accessToken}`}});const data=await r.json();if(data.values){for(const[k,v]of data.values){if(k==='exerciseGoal')cfg.eg=parseInt(v)||30;if(k==='sleepGoal')cfg.sg=v||'23:00';if(k==='calorieGoal')cfg.cg=parseInt(v)||1800;if(k==='budget')cfg.bg=parseInt(v)||10000;}}document.getElementById('sg1').value=cfg.eg;document.getElementById('sg2').value=cfg.sg;document.getElementById('sg3').value=cfg.cg;document.getElementById('sg4').value=cfg.bg;}
 
 function fabClick(){if(curTab==='e'||curTab==='s')oA('expense');else oA(null);}
@@ -577,23 +626,90 @@ function pEc(c){sec=c;rEc(c);}
 function aEc(){const n=prompt('新增類別：');if(n&&!ecl.includes(n)){ecl.push(n);rEc(n);}}
 
 function oDp(context){dpContext=context||'checkin';if(context==='expense'){dpm=new Date(expSelDate.getFullYear(),expSelDate.getMonth(),1);dps=new Date(expSelDate);}else{dpm=new Date(cur.getFullYear(),cur.getMonth(),1);dps=new Date(cur);}rDg();document.getElementById('dpb').classList.add('op');}
-function cDp(ev){if(ev&&ev.target!==document.getElementById('dpb'))return;document.getElementById('dpb').classList.remove('op');}
+
+function smoothClose(id) {
+  const bg = document.getElementById(id);
+  if(!bg.classList.contains('op')) return;
+  const mo = bg.querySelector('.mo');
+  mo.style.transition = 'transform 0.2s ease-in';
+  mo.style.transform = 'translateY(100%)';
+  setTimeout(() => {
+    bg.classList.remove('op');
+    mo.style.transform = '';
+    mo.style.transition = '';
+  }, 200);
+}
+
+function cDp(ev){if(ev&&ev.target!==document.getElementById('dpb'))return; smoothClose('dpb');}
 function dpM(d){dpm=new Date(dpm.getFullYear(),dpm.getMonth()+d,1);rDg();}
 function rDg(){const y=dpm.getFullYear(),m=dpm.getMonth(),dim=new Date(y,m+1,0).getDate(),fd2=new Date(y,m,1).getDay(),today=new Date();document.getElementById('dpt').textContent=`${y}年${m+1}月`;const g=document.getElementById('dpg');g.innerHTML='';for(let i=0;i<fd2;i++){const e=document.createElement('button');e.className='dd em';e.disabled=true;g.appendChild(e);}for(let d=1;d<=dim;d++){const e=document.createElement('button');e.className='dd';e.textContent=d;const dd=new Date(y,m,d);if(dd>today){e.classList.add('fu');e.disabled=true;}if(today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d)e.classList.add('td3');if(dps&&dps.getFullYear()===y&&dps.getMonth()===m&&dps.getDate()===d)e.classList.add('ds');e.onclick=()=>{if(dd<=today){dps=new Date(y,m,d);rDg();}};g.appendChild(e);}}
-function cfD(){if(dps){if(dpContext==='expense'){expSelDate=new Date(dps);document.getElementById('edd').textContent=fdS(expSelDate);}else{cur=new Date(dps);rC();}}document.getElementById('dpb').classList.remove('op');}
+function cfD(){if(dps){if(dpContext==='expense'){expSelDate=new Date(dps);document.getElementById('edd').textContent=fdS(expSelDate);}else{cur=new Date(dps);rC();}} smoothClose('dpb');}
 
 function oA(type){eid=null;const isPlus=type===null;document.getElementById('mt').textContent=type?{exercise:'新增運動',meal:'新增餐點',sleep:'新增睡眠記錄',expense:'新增支出'}[type]:'新增記錄';document.getElementById('db').style.display='none';document.getElementById('tr').style.display=isPlus?'grid':'none';['fen','fem','fmn','fmc','fma','fsn','fepn','fepa','fepnt'].forEach(id=>document.getElementById(id).value='');expSelDate=new Date();document.getElementById('edd').textContent='今天';const t=type||'exercise';sT(t,document.querySelector(`[data-t="${t}"]`));const now=new Date();sh=now.getHours();sm=Math.floor(now.getMinutes()/5)*5;iD();rQt();document.getElementById('mbg').classList.add('op');}
 function oEd(id){const e=entries.find(x=>x.id===id);if(!e)return;eid=id;document.getElementById('mt').textContent='編輯記錄';document.getElementById('tr').style.display='none';document.getElementById('db').style.display='block';st=e.type;const[h,m]=e.time.split(':').map(Number);sh=h;sm=m;iD();rQt();if(e.type==='expense'){const pts=e.date.split('-').map(Number);expSelDate=new Date(pts[0],pts[1]-1,pts[2]);document.getElementById('edd').textContent=fdS(expSelDate);}['fex','fml','fsl','fep'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('exp-date-section').style.display=e.type==='expense'?'block':'none';if(e.type==='exercise'){document.getElementById('fex').style.display='block';rEp(e.name);document.getElementById('fen').value=e.name;document.getElementById('fem').value=e.value;}else if(e.type==='meal'){document.getElementById('fml').style.display='block';rMp(e.name);document.getElementById('fmn').value=e.name;document.getElementById('fmc').value=e.value;document.getElementById('fma').value=e.amt||'';}else if(e.type==='sleep'){document.getElementById('fsl').style.display='block';document.getElementById('fsn').value=e.note||'';}else if(e.type==='expense'){document.getElementById('fep').style.display='block';rEc(e.cat);document.getElementById('fepn').value=e.name;document.getElementById('fepa').value=e.value;document.getElementById('fepnt').value=e.note||'';}document.getElementById('mbg').classList.add('op');}
-function cM(ev){if(ev&&ev.target!==document.getElementById('mbg'))return;document.getElementById('mbg').classList.remove('op');}
+function cM(ev){if(ev&&ev.target!==document.getElementById('mbg'))return; smoothClose('mbg');}
 function sT(t,el){st=t;document.querySelectorAll('.tp').forEach(b=>b.classList.remove('sl'));if(el)el.classList.add('sl');['fex','fml','fsl','fep'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('exp-date-section').style.display=t==='expense'?'block':'none';if(t==='exercise'){document.getElementById('fex').style.display='block';rEp('');}else if(t==='meal'){document.getElementById('fml').style.display='block';rMp('');}else if(t==='sleep')document.getElementById('fsl').style.display='block';else if(t==='expense'){document.getElementById('fep').style.display='block';rEc();}rQt();}
-function svE(){const time=gt();const useDate=st==='expense'?dk3(expSelDate):dk3(cur);let e={id:eid||gid(),date:useDate,type:st,time,name:'',value:'',note:'',amt:'',cat:'',fm:false};if(st==='exercise'){e.name=document.getElementById('fen').value||'運動';e.value=document.getElementById('fem').value||'0';}else if(st==='meal'){e.name=document.getElementById('fmn').value||'餐點';e.value=document.getElementById('fmc').value||'0';e.amt=document.getElementById('fma').value||'';if(e.amt&&!eid)entries.push({id:gid(),date:dk3(cur),type:'expense',time,name:e.name,value:e.amt,note:'來自餐點',cat:'🍽️ 餐飲',fm:true});}else if(st==='sleep'){e.note=document.getElementById('fsn').value;}else if(st==='expense'){e.name=document.getElementById('fepn').value||'支出';e.value=document.getElementById('fepa').value||'0';e.note=document.getElementById('fepnt').value;e.cat=sec;}if(eid){const i=entries.findIndex(x=>x.id===eid);if(i>=0)entries[i]=e;}else entries.push(e);document.getElementById('mbg').classList.remove('op');rC();if(curTab==='e')rE();scheduleSave();}
-function delE(){if(!eid)return;entries=entries.filter(e=>e.id!==eid);document.getElementById('mbg').classList.remove('op');rC();if(curTab==='e')rE();scheduleSave();}
+function svE(){const time=gt();const useDate=st==='expense'?dk3(expSelDate):dk3(cur);let e={id:eid||gid(),date:useDate,type:st,time,name:'',value:'',note:'',amt:'',cat:'',fm:false};if(st==='exercise'){e.name=document.getElementById('fen').value||'運動';e.value=document.getElementById('fem').value||'0';}else if(st==='meal'){e.name=document.getElementById('fmn').value||'餐點';e.value=document.getElementById('fmc').value||'0';e.amt=document.getElementById('fma').value||'';if(e.amt&&!eid)entries.push({id:gid(),date:dk3(cur),type:'expense',time,name:e.name,value:e.amt,note:'來自餐點',cat:'🍽️ 餐飲',fm:true});}else if(st==='sleep'){e.note=document.getElementById('fsn').value;}else if(st==='expense'){e.name=document.getElementById('fepn').value||'支出';e.value=document.getElementById('fepa').value||'0';e.note=document.getElementById('fepnt').value;e.cat=sec;}if(eid){const i=entries.findIndex(x=>x.id===eid);if(i>=0)entries[i]=e;}else entries.push(e); smoothClose('mbg'); rC();if(curTab==='e')rE();scheduleSave();}
+function delE(){if(!eid)return;entries=entries.filter(e=>e.id!==eid); smoothClose('mbg'); rC();if(curTab==='e')rE();scheduleSave();}
 async function saveSet(){cfg.eg=parseInt(document.getElementById('sg1').value)||30;cfg.sg=document.getElementById('sg2').value||'23:00';cfg.cg=parseInt(document.getElementById('sg3').value)||1800;cfg.bg=parseInt(document.getElementById('sg4').value)||10000;await sw('settings!A2:B5',[['exerciseGoal',cfg.eg],['sleepGoal',cfg.sg],['calorieGoal',cfg.cg],['budget',cfg.bg]]);const m=document.getElementById('sgm');m.textContent='✓ 已儲存';setTimeout(()=>m.textContent='',2000);}
 
 function rC(){const key=dk3(cur),today=new Date(),diff=Math.round((today-cur)/86400000);document.getElementById('dd').textContent=fd(cur);document.getElementById('ds').textContent=diff===0?'今天 · 點此換日期':diff===1?'昨天 · 點此換日期':'點此換日期';document.getElementById('nb').disabled=diff<=0;const de=entries.filter(e=>e.date===key).sort((a,b)=>a.time.localeCompare(b.time));document.getElementById('sex').textContent=de.filter(e=>e.type==='exercise').reduce((s,e)=>s+(parseInt(e.value)||0),0);document.getElementById('scal').textContent=de.filter(e=>e.type==='meal').reduce((s,e)=>s+(parseInt(e.value)||0),0);const sl=de.find(e=>e.type==='sleep');document.getElementById('ssl').textContent=sl?sl.time:'--:--';document.getElementById('sexp').textContent='$'+de.filter(e=>e.type==='expense').reduce((s,e)=>s+(parseFloat(e.value)||0),0);const vis=de.filter(e=>!(e.type==='expense'&&e.fm));const tl=document.getElementById('tl');if(!vis.length){tl.innerHTML='<div class="te">✨ 點上方卡片開始記錄</div>';return;}tl.innerHTML=vis.map(e=>{const ic={exercise:'🏃',meal:'🍽️',sleep:'🌙',expense:'💰'}[e.type]||'📌';const dc={exercise:'dex',meal:'dml',sleep:'dsl',expense:'dep'}[e.type]||'dep';let tn='',dt='',bd='';if(e.type==='exercise'){tn=e.name;dt=`${e.value} 分鐘`;const ok=parseInt(e.value)>=cfg.eg;bd=`<span class="bg bex">${e.value}分</span>${ok?'<span class="bg bok">✓達標</span>':''}`;}else if(e.type==='meal'){tn=e.name;dt=`${e.value}kcal${e.amt?` · $${e.amt}`:''}`;bd=`<span class="bg bml">${e.value}kcal</span>${e.amt?`<span class="bg bep">$${e.amt}</span>`:''}`;}else if(e.type==='sleep'){tn='入睡';dt=e.note||'';const ok=e.time<=cfg.sg;bd=`<span class="bg bsl">${e.time}</span>${ok?'<span class="bg bok">✓達標</span>':''}`;}else if(e.type==='expense'){tn=e.name;dt=`${e.cat||''}${e.note?` · ${e.note}`:''}`;bd=`<span class="bg bep">$${e.value}</span>`;}return `<div class="ti"><div class="td2 ${dc}">${ic}</div><div class="tc" onclick="oEd('${e.id}')"><div class="th"><div class="tn">${tn}</div><div class="tt">${e.time}</div></div>${dt?`<div class="tdt">${dt}</div>`:''}<div>${bd}</div></div></div>`;}).join('');}
 function rE(){const y=exm.getFullYear(),m=exm.getMonth(),mk=`${y}-${p(m+1)}`,tk=dk3(new Date());document.getElementById('em').textContent=`${y}年${m+1}月`;document.getElementById('et').textContent='$'+entries.filter(e=>e.type==='expense'&&e.date===tk).reduce((s,e)=>s+(parseFloat(e.value)||0),0);document.getElementById('emo').textContent='$'+entries.filter(e=>e.type==='expense'&&e.date.startsWith(mk)).reduce((s,e)=>s+(parseFloat(e.value)||0),0);document.getElementById('eml').textContent='$'+entries.filter(e=>e.type==='expense'&&e.date.startsWith(mk)&&e.cat==='🍽️ 餐飲').reduce((s,e)=>s+(parseFloat(e.value)||0),0);const list=entries.filter(e=>e.type==='expense'&&e.date.startsWith(mk)).sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));const el=document.getElementById('el2');if(!list.length){el.innerHTML='<div class="ee">💰 本月還沒有記錄</div>';return;}let html='',ld='';list.forEach(e=>{if(e.date!==ld){html+=`<div style="font-size:.75rem;color:var(--muted);margin:10px 0 5px;font-weight:600">${e.date}</div>`;ld=e.date;}html+=`<div class="ei" onclick="oEd('${e.id}')"><div class="elf"><div class="eic">${e.cat?e.cat.split(' ')[0]:'💰'}</div><div><div class="enm">${e.name}</div><div class="emt">${e.cat||''}${e.note?` · ${e.note}`:''}</div></div></div><div class="eam">$${e.value}</div></div>`;});el.innerHTML=html;}
 function rS(){const y=stm.getFullYear(),m=stm.getMonth();document.getElementById('sm2').textContent=`${y}年${m+1}月`;let streak=0;const d2=new Date();while(streak<365){const k=dk3(d2);const de=entries.filter(e=>e.date===k);const ex=de.filter(e=>e.type==='exercise').reduce((s,e)=>s+(parseInt(e.value)||0),0);const sl=de.find(e=>e.type==='sleep');if(ex<cfg.eg&&(!sl||sl.time>cfg.sg))break;streak++;d2.setDate(d2.getDate()-1);}document.getElementById('sk').textContent=streak;const dim=new Date(y,m+1,0).getDate();let ed=0,sd=0,cd=0,bd=0;for(let d=1;d<=dim;d++){const k=`${y}-${p(m+1)}-${p(d)}`;const de=entries.filter(e=>e.date===k);const ex=de.filter(e=>e.type==='exercise').reduce((s,e)=>s+(parseInt(e.value)||0),0);const sl=de.find(e=>e.type==='sleep');const hm=de.some(e=>e.type==='meal');const eo=ex>=cfg.eg,so=sl&&sl.time<=cfg.sg;if(eo)ed++;if(so)sd++;if(hm)cd++;if(eo&&so)bd++;}document.getElementById('se').textContent=ed;document.getElementById('ssl2').textContent=sd;document.getElementById('sc2').textContent=cd;document.getElementById('sb').textContent=bd;const g=document.getElementById('cg');g.innerHTML='';const fd3=new Date(y,m,1).getDay(),today=new Date();for(let i=0;i<fd3;i++){const e=document.createElement('div');e.className='cd em';g.appendChild(e);}for(let d=1;d<=dim;d++){const k=`${y}-${p(m+1)}-${p(d)}`;const de=entries.filter(e=>e.date===k);const el=document.createElement('div');el.className='cd';el.textContent=d;if(today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d)el.classList.add('td');if(de.length){const ex=de.filter(e=>e.type==='exercise').reduce((s,e)=>s+(parseInt(e.value)||0),0);const sl=de.find(e=>e.type==='sleep');if(ex>=cfg.eg&&sl&&sl.time<=cfg.sg)el.classList.add('fu');else el.classList.add('pt');}el.onclick=()=>{cur=new Date(y,m,d);tab('c',document.querySelector('.tb'));rC();};g.appendChild(el);}rSp();}
 function rSp(){const y=stm.getFullYear(),m=stm.getMonth(),mk=`${y}-${p(m+1)}`;const dim=new Date(y,m+1,0).getDate(),today=new Date();const pd=y===today.getFullYear()&&m===today.getMonth()?today.getDate():dim;const mt=entries.filter(e=>e.type==='expense'&&e.date.startsWith(mk)).reduce((s,e)=>s+(parseFloat(e.value)||0),0);const pct=cfg.bg>0?Math.min(Math.round(mt/cfg.bg*100),100):0;const ov=mt>cfg.bg;document.getElementById('su').textContent=`$${mt}`;document.getElementById('sbg').textContent=`$${cfg.bg}`;document.getElementById('sbr').style.width=`${pct}%`;document.getElementById('sbr').className=`bf${ov?' ov':''}`;document.getElementById('spc').textContent=`${pct}%${ov?' ⚠️ 超出預算':''}`;document.getElementById('stt').textContent=`$${mt}`;document.getElementById('sdv').textContent=`$${pd>0?Math.round(mt/pd):0}`;const cm={};entries.filter(e=>e.type==='expense'&&e.date.startsWith(mk)).forEach(e=>{const c=e.cat||'其他';cm[c]=(cm[c]||0)+(parseFloat(e.value)||0);});const cats=Object.entries(cm).sort((a,b)=>b[1]-a[1]);const total=cats.reduce((s,c)=>s+c[1],0);const svg=document.getElementById('psv'),leg=document.getElementById('pl');if(!cats.length){svg.innerHTML='<circle cx="55" cy="55" r="40" fill="#f0f0f5"/>';leg.innerHTML='<div style="color:var(--muted);font-size:.8rem">暫無資料</div>';return;}let ang=-Math.PI/2,paths='';const cx=55,cy=55,r=40;cats.forEach((c,i)=>{const a=(c[1]/total)*Math.PI*2;const x1=cx+r*Math.cos(ang),y1=cy+r*Math.sin(ang),x2=cx+r*Math.cos(ang+a),y2=cy+r*Math.sin(ang+a);const lg=a>Math.PI?1:0;paths+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${lg},1 ${x2},${y2} Z" fill="${PC[i%PC.length]}"/>`;ang+=a;});svg.innerHTML=paths+`<circle cx="${cx}" cy="${cy}" r="22" fill="var(--surf)"/>`;leg.innerHTML=cats.map((c,i)=>`<div class="pli"><div class="pd" style="background:${PC[i%PC.length]}"></div><span>${c[0].replace(/^\S+\s/,'')}</span><span style="margin-left:auto;font-weight:600">$${c[1]}</span></div>`).join('');}
+
+let dragStartY = 0;
+let dragStartScrollY = 0;
+let isDraggingModal = false;
+let currentDragModal = null;
+
+function initSwipeDismiss(modalId, closeFn) {
+  const mb = document.getElementById(modalId);
+  const mo = mb.querySelector('.mo');
+
+  mo.addEventListener('touchstart', e => {
+    dragStartY = e.touches[0].clientY;
+    dragStartScrollY = mo.scrollTop;
+    if (dragStartScrollY <= 0) {
+      isDraggingModal = true;
+      currentDragModal = mo;
+      mo.style.transition = 'none';
+    }
+  }, { passive: true });
+
+  mo.addEventListener('touchmove', e => {
+    if (!isDraggingModal || currentDragModal !== mo) return;
+    const deltaY = e.touches[0].clientY - dragStartY;
+    if (deltaY > 0 && dragStartScrollY <= 0) {
+      mo.style.transform = `translateY(${deltaY}px)`;
+      if (e.cancelable) e.preventDefault();
+    } else {
+      isDraggingModal = false;
+    }
+  }, { passive: false });
+
+  mo.addEventListener('touchend', e => {
+    if (!isDraggingModal || currentDragModal !== mo) return;
+    isDraggingModal = false;
+    const deltaY = e.changedTouches[0].clientY - dragStartY;
+
+    if (deltaY > 120) {
+      mo.style.transition = 'transform 0.2s ease-in';
+      mo.style.transform = `translateY(100%)`;
+      setTimeout(() => { closeFn(); }, 200);
+    } else {
+      mo.style.transition = 'transform 0.2s ease-out';
+      mo.style.transform = `translateY(0)`;
+      setTimeout(() => { mo.style.transform = ''; mo.style.transition = ''; }, 200);
+    }
+  });
+}
+
+setTimeout(() => {
+  initSwipeDismiss('mbg', () => smoothClose('mbg'));
+  initSwipeDismiss('dpb', () => smoothClose('dpb'));
+}, 100);
+
 </script>
 </body>
 </html>
