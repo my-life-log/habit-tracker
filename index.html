@@ -401,10 +401,9 @@ header h1{font-size:.95rem;font-weight:700}
 </div>
 
 <script>
-const CLIENT_ID='356208945340-11cretd36ev8chp83lj6d82ttvt1r0tn.apps.googleusercontent.com';
-const SCOPES='https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file profile email';
+const WORKER='https://habit-auth.as012314.workers.dev';
 const IH=38,PC=['#6c5ce7','#00b894','#fdcb6e','#e17055','#74b9ff','#fd79a8','#a29bfe','#55efc4'];
-let tokenClient,accessToken=null,userInfo=null,sheetId=null;
+let accessToken=null,userInfo=null,sheetId=null;
 let dk2=false,cur=new Date(),eid=null,st='exercise';
 let entries=[],cfg={eg:30,sg:'23:00',cg:1800,bg:10000};
 let sh=new Date().getHours(),sm=Math.floor(new Date().getMinutes()/5)*5;
@@ -449,43 +448,90 @@ function loadBg(){
   }catch(e){}
 }
 
-window.onload=()=>{
+async function enterApp(){
+  document.getElementById('auth').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('fab').style.display='flex';
+  cur=new Date();rC();
+}
+
+function showLogin(){
+  document.getElementById('spinner').style.display='none';
+  document.getElementById('login-status').style.display='none';
+  document.getElementById('gsb').style.display='flex';
+}
+
+async function tryAutoLogin(){
+  const uid=localStorage.getItem('uid');
+  if(!uid)return false;
+  try{
+    const r=await fetch(`${WORKER}/token?uid=${uid}`);
+    if(!r.ok)throw new Error();
+    const data=await r.json();
+    if(data.error)throw new Error();
+    accessToken=data.access_token;
+    userInfo=data.user;
+    document.getElementById('uav').src=userInfo.picture;
+    await initSheet();
+    return true;
+  }catch(e){
+    localStorage.removeItem('uid');
+    return false;
+  }
+}
+
+window.onload=async()=>{
   loadBg();
   const saved=localStorage.getItem('theme');
   if(saved==='dark'){dk2=true;document.body.className='dk';document.getElementById('thb').textContent='☀️';}
-  const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=initGSI;document.head.appendChild(s);
-};
 
-function initGSI(){
-  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:async(resp)=>{
-    if(resp.error){
-      document.getElementById('spinner').style.display='none';
-      document.getElementById('login-status').style.display='none';
-      document.getElementById('gsb').style.display='flex';
-      document.getElementById('aerr').textContent=resp.error;
-      document.getElementById('aerr').style.display='block';
-      return;
-    }
-    accessToken=resp.access_token;
-    document.getElementById('login-status').textContent='載入資料中…';
-    await loadUserInfo();await initSheet();
-    document.getElementById('auth').style.display='none';
-    document.getElementById('app').style.display='block';
-    document.getElementById('fab').style.display='flex';
-    cur=new Date();rC();
-  }});
-}
+  // 檢查是否從 Google 回調帶回 uid
+  const params=new URLSearchParams(location.search);
+  const uid=params.get('uid');
+  if(uid){
+    localStorage.setItem('uid',uid);
+    history.replaceState({},'',location.pathname);
+  }
+
+  // 嘗試自動登入
+  const uidStored=localStorage.getItem('uid');
+  if(uidStored){
+    document.getElementById('spinner').style.display='block';
+    document.getElementById('login-status').style.display='block';
+    document.getElementById('login-status').textContent='登入中…';
+    const ok=await tryAutoLogin();
+    if(ok){await enterApp();return;}
+  }
+  showLogin();
+};
 
 document.getElementById('gsb').onclick=()=>{
-  document.getElementById('gsb').style.display='none';
-  document.getElementById('spinner').style.display='block';
-  document.getElementById('login-status').style.display='block';
-  document.getElementById('login-status').textContent='登入中…';
-  tokenClient.requestAccessToken({prompt:''});
+  window.location.href=`${WORKER}/login`;
 };
 
-function signOut(){if(!confirm('確定要登出嗎？'))return;google.accounts.oauth2.revoke(accessToken);accessToken=null;userInfo=null;sheetId=null;entries=[];document.getElementById('app').style.display='none';document.getElementById('fab').style.display='none';document.getElementById('spinner').style.display='none';document.getElementById('login-status').style.display='none';document.getElementById('gsb').style.display='flex';document.getElementById('auth').style.display='flex';}
-async function loadUserInfo(){const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${accessToken}`}});userInfo=await r.json();document.getElementById('uav').src=userInfo.picture;}
+async function signOut(){
+  if(!confirm('確定要登出嗎？'))return;
+  const uid=localStorage.getItem('uid');
+  if(uid)await fetch(`${WORKER}/logout?uid=${uid}`).catch(()=>{});
+  localStorage.removeItem('uid');
+  accessToken=null;userInfo=null;sheetId=null;entries=[];
+  document.getElementById('app').style.display='none';
+  document.getElementById('fab').style.display='none';
+  document.getElementById('auth').style.display='flex';
+  showLogin();
+}
+
+// 自動刷新 access token（每 50 分鐘）
+setInterval(async()=>{
+  const uid=localStorage.getItem('uid');
+  if(!uid||!accessToken)return;
+  try{
+    const r=await fetch(`${WORKER}/token?uid=${uid}`);
+    const data=await r.json();
+    if(data.access_token)accessToken=data.access_token;
+  }catch(e){}
+},50*60*1000);
+
 async function initSheet(){
   const sr=await fetch(`https://www.googleapis.com/drive/v3/files?q=name%3D'habit-data-${userInfo.sub}'%20and%20mimeType%3D'application%2Fvnd.google-apps.spreadsheet'&spaces=drive`,{headers:{Authorization:`Bearer ${accessToken}`}});
   const sd=await sr.json();
